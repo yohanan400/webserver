@@ -1,9 +1,8 @@
 add_library(webserver_lib
-        #net/Socket.cpp
-        #net/Acceptor.cpp
+        net/Socket.cpp
+        net/Acceptor.cpp
         #threadpool/ThreadPool.cpp
         utils/Logger.cpp
-        utils/Logger.h
 )
 
 target_include_directories(webserver_lib
@@ -11,4 +10,4 @@ target_include_directories(webserver_lib
 )
 
 add_executable(webserver main.cpp)
-target_link_libraries(webserver PRIVATE webserver_lib)
+target_link_libraries(webserver PRIVATE webserver_lib stdc++)
