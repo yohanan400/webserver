@@ -9,5 +9,7 @@ target_include_directories(webserver_lib
         PUBLIC ${CMAKE_SOURCE_DIR}/src
 )
 
-add_executable(webserver main.cpp)
+add_executable(webserver main.cpp
+        threadpool/ThreadPool.cpp
+        threadpool/ThreadPool.h)
 target_link_libraries(webserver PRIVATE webserver_lib stdc++)
