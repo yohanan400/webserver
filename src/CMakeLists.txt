@@ -11,5 +11,9 @@ target_include_directories(webserver_lib
 
 add_executable(webserver main.cpp
         threadpool/ThreadPool.cpp
-        threadpool/ThreadPool.h)
+        threadpool/ThreadPool.h
+        http/HttpRequest.cpp
+        http/HttpRequest.h
+        http/HttpParser.cpp
+        http/HttpParser.h)
 target_link_libraries(webserver PRIVATE webserver_lib stdc++)
