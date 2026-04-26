@@ -75,7 +75,7 @@ webserver/
 ### Steps
 
 ```bash
-git clone https://github.com/USERNAME/webserver.git
+git clone https://github.com/yohanan400/webserver.git
 cd webserver
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
