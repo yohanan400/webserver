@@ -6,23 +6,23 @@ class HttpRequest {
 public:
     HttpRequest() = default;
 
-    [[nodiscard]] std::string get_method() const;
-    void set_method(const std::string& method);
+    [[nodiscard]] std::string getMethod() const;
+    void setMethod(const std::string& method);
 
-    [[nodiscard]] std::string get_path() const;
-    void set_path(const std::string& path);
+    [[nodiscard]] std::string getPath() const;
+    void setPath(const std::string& path);
 
-    [[nodiscard]] std::string get_query() const;
-    void set_query(const std::string& query);
+    [[nodiscard]] std::string getQuery() const;
+    void setQuery(const std::string& query);
 
-    [[nodiscard]] std::unordered_map<std::string, std::string> get_headers() const;
-    void set_headers(const std::unordered_map<std::string, std::string>& headers);
+    [[nodiscard]] std::unordered_map<std::string, std::string> getHeaders() const;
+    void setHeaders(const std::unordered_map<std::string, std::string>& headers);
 
-    [[nodiscard]] std::string get_body() const;
-    void set_body(const std::string& body);
+    [[nodiscard]] std::string getBody() const;
+    void setBody(const std::string& body);
 
-    [[nodiscard]] std::string get_version() const;
-    void set_version(const std::string& version);
+    [[nodiscard]] std::string getVersion() const;
+    void setVersion(const std::string& version);
 
 private:
     std::string _method;

@@ -8,6 +8,8 @@
 #include "net/Socket.h"
 #include "threadpool/ThreadPool.h"
 #include "utils/Logger.h"
+#include "router/Router.h"
+
 
 int main() {
     Logger::info("WebServer starting...");
@@ -16,6 +18,13 @@ int main() {
     {
         int cores = (int)sysconf(_SC_NPROCESSORS_ONLN);
         ThreadPool thread_pool(cores);
+
+        Router router = Router();
+        router.addRoute("GET", "/api/user", \
+            [](const HttpRequest& request){\
+                Logger::info("method: " +request.getMethod());\
+                Logger::info("path: " +request.getPath());});
+
         Acceptor acceptor = Acceptor(5555);
         acceptor.bind();
         acceptor.listen();
@@ -23,7 +32,7 @@ int main() {
         {
             Socket new_socket = acceptor.accept();
             auto shared_socket = std::make_shared<Socket>(std::move(new_socket));
-            thread_pool.submit([shared_socket]()
+            thread_pool.submit([shared_socket, &router]()
             {
                 Logger::info("Socket accepted " + std::to_string(shared_socket->getFd()));
 
@@ -40,12 +49,8 @@ int main() {
                     HttpParser parser;
                     HttpRequest request = parser.parse(buffer);
 
-                    Logger::info("method: " +request.get_method());
-                    Logger::info("path: " +request.get_path());
+                    router.route(request);
                 }
-
-
-
             });
 
         }

@@ -33,19 +33,19 @@ void HttpParser::parseRequestLine(const std::string& line)
         throw std::runtime_error("Invalid HTTP request line!");
     }
 
-    _httpRequest.set_method(line.substr(0, end_method_pos));
+    _httpRequest.setMethod(line.substr(0, end_method_pos));
 
     if (end_path_pos != std::string::npos)
     {
-        _httpRequest.set_path(line.substr(end_method_pos + 1, end_path_pos - (end_method_pos + 1)));
-        _httpRequest.set_query(line.substr(end_path_pos + 1, end_query_pos - (end_path_pos + 1)));
+        _httpRequest.setPath(line.substr(end_method_pos + 1, end_path_pos - (end_method_pos + 1)));
+        _httpRequest.setQuery(line.substr(end_path_pos + 1, end_query_pos - (end_path_pos + 1)));
 
     }
     else{
-        _httpRequest.set_path(line.substr(end_method_pos + 1, end_query_pos - (end_method_pos + 1)));
+        _httpRequest.setPath(line.substr(end_method_pos + 1, end_query_pos - (end_method_pos + 1)));
     }
 
-    _httpRequest.set_version(line.substr(end_query_pos + 1));
+    _httpRequest.setVersion(line.substr(end_query_pos + 1));
 }
 
 void HttpParser::parseHeaders(const std::string& headersSection)
@@ -77,7 +77,7 @@ void HttpParser::parseHeaders(const std::string& headersSection)
             next_crlf_pos = headersSection.find("\r\n", crlf_pos + CRLF);
         } while (next_crlf_pos != std::string::npos);
 
-        _httpRequest.set_headers(headers);
+        _httpRequest.setHeaders(headers);
     }
 }
 
@@ -85,6 +85,6 @@ void HttpParser::parseBody(const std::string& body)
 {
     if (!body.empty())
     {
-        _httpRequest.set_body(body);
+        _httpRequest.setBody(body);
     }
 }

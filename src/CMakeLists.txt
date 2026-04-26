@@ -15,5 +15,7 @@ add_executable(webserver main.cpp
         http/HttpRequest.cpp
         http/HttpRequest.h
         http/HttpParser.cpp
-        http/HttpParser.h)
+        http/HttpParser.h
+        router/Router.cpp
+        router/Router.h)
 target_link_libraries(webserver PRIVATE webserver_lib stdc++)
