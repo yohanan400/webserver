@@ -14,7 +14,7 @@ Socket::Socket()
     }
 }
 
-Socket::Socket(Socket&& other)noexcept: _fd(other._fd)
+Socket::Socket(Socket&& other) noexcept : _fd(other._fd)
 {
     other._fd = -1;
 }

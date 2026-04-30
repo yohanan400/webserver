@@ -7,7 +7,8 @@
 #include <thread>
 #include <vector>
 
-class ThreadPool {
+class ThreadPool
+{
 public:
     ThreadPool(size_t thread_count);
     void submit(std::function<void()>);

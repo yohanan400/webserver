@@ -2,7 +2,8 @@
 #include <string>
 #include <unordered_map>
 
-class HttpRequest {
+class HttpRequest
+{
 public:
     HttpRequest() = default;
 

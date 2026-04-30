@@ -19,5 +19,7 @@ add_executable(webserver main.cpp
         router/Router.cpp
         router/Router.h
         http/HttpResponse.cpp
-        http/HttpResponse.h)
+        http/HttpResponse.h
+        middleware/Middleware.cpp
+        middleware/Middleware.h)
 target_link_libraries(webserver PRIVATE webserver_lib stdc++)

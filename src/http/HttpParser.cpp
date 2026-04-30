@@ -39,9 +39,9 @@ void HttpParser::parseRequestLine(const std::string& line)
     {
         _httpRequest.setPath(line.substr(end_method_pos + 1, end_path_pos - (end_method_pos + 1)));
         _httpRequest.setQuery(line.substr(end_path_pos + 1, end_query_pos - (end_path_pos + 1)));
-
     }
-    else{
+    else
+    {
         _httpRequest.setPath(line.substr(end_method_pos + 1, end_query_pos - (end_method_pos + 1)));
     }
 
@@ -52,7 +52,6 @@ void HttpParser::parseHeaders(const std::string& headersSection)
 {
     if (!headersSection.empty())
     {
-
         std::unordered_map<std::string, std::string> headers;
 
         constexpr size_t CRLF = 2;
@@ -75,7 +74,8 @@ void HttpParser::parseHeaders(const std::string& headersSection)
 
             crlf_pos = next_crlf_pos;
             next_crlf_pos = headersSection.find("\r\n", crlf_pos + CRLF);
-        } while (next_crlf_pos != std::string::npos);
+        }
+        while (next_crlf_pos != std::string::npos);
 
         _httpRequest.setHeaders(headers);
     }

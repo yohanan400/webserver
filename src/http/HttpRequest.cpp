@@ -1,4 +1,5 @@
 #include "HttpRequest.h"
+
 [[nodiscard]] std::string HttpRequest::getMethod() const
 {
     return _method;

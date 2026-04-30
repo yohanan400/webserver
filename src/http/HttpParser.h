@@ -13,5 +13,3 @@ private:
     void parseHeaders(const std::string& headersSection);
     void parseBody(const std::string& body);
 };
-
-

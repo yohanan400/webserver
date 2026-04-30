@@ -32,7 +32,7 @@ std::string HttpResponse::toString() const
     }
 
     return _version + " " + std::to_string(_code) + " " + _code_string + "\r\n"\
-            + headers + "\r\n" + _body;
+        + headers + "\r\n" + _body;
 }
 
 [[nodiscard]] size_t HttpResponse::getCode() const

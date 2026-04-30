@@ -14,7 +14,7 @@ Acceptor::Acceptor(const int port, const int backlog) : _port(port), _backlog(ba
 
     if (result == -1)
     {
-        Logger::error( "setsockopt SO_REUSEADDR failed");
+        Logger::error("setsockopt SO_REUSEADDR failed");
         throw std::runtime_error("setsockopt SO_REUSEADDR failed");
     }
 }

@@ -2,7 +2,8 @@
 
 #include "utils/Logger.h"
 
-void Router::addRoute(const std::string& method, const std::string& path, const std::function<void(const HttpRequest&, const std::shared_ptr<Socket>&)>& handler)
+void Router::addRoute(const std::string& method, const std::string& path,
+                      const std::function<void(const HttpRequest&, const std::shared_ptr<Socket>&)>& handler)
 {
     _handlers_map[method + ":" + path] = handler;
 }
