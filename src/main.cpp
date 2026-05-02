@@ -43,6 +43,14 @@ int main()
         acceptor.listen();
 
         auto mpl = MiddlewarePipeline();
+        // Add one middleware for example
+        mpl.use([](const HttpRequest& http_request, const std::shared_ptr<Socket>& socket, const Next& next)
+        {
+            Logger::info("method: " + http_request.getMethod());\
+            Logger::info("path: " + http_request.getPath());
+
+            next();
+        });
 
         while (true)
         {
@@ -64,16 +72,6 @@ int main()
 
                     HttpParser parser;
                     HttpRequest request = parser.parse(buffer);
-
-                    // Add one middleware for example
-                    mpl.use([](const HttpRequest& http_request, const std::shared_ptr<Socket>& socket, const Next& next)
-                    {
-                        Logger::info("method: " + http_request.getMethod());\
-                        Logger::info("path: " + http_request.getPath());
-
-                        next();
-                    });
-
 
                     mpl.execute(request, shared_socket, [&router, request, shared_socket]()
                     {
