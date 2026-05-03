@@ -41,7 +41,7 @@ int main()
 
         auto mpl = MiddlewarePipeline();
         // Add Rate Limiter as middleware
-        auto rate_limiter = RateLimiter(1, 60);
+        auto rate_limiter = RateLimiter(100, 60);
         mpl.use([&rate_limiter](const HttpRequest& http_request, HttpResponse& response, const std::shared_ptr<Socket>& socket,
                    const Next& next)
         {
