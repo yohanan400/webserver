@@ -5,6 +5,7 @@
 #include <cerrno>
 #include "Socket.h"
 #include "utils/Logger.h"
+#include <arpa/inet.h>
 
 Acceptor::Acceptor(const int port, const int backlog) : _port(port), _backlog(backlog)
 {
@@ -58,5 +59,7 @@ Socket Acceptor::accept()
         throw std::runtime_error("accept() failed");
     }
 
-    return Socket(result);
+    auto* addr_in = reinterpret_cast<sockaddr_in*>(&their_addr);
+    std::string ip = inet_ntoa(addr_in->sin_addr);
+    return Socket(result, ip);
 }

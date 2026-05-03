@@ -11,6 +11,7 @@
 #include "threadpool/ThreadPool.h"
 #include "utils/Logger.h"
 #include "router/Router.h"
+#include "utils/RateLimiter.h"
 
 
 int main()
@@ -24,18 +25,14 @@ int main()
 
         auto router = Router();
         router.addRoute("GET", "/api/user",
-                        [](const HttpRequest& request, const std::shared_ptr<Socket>& socket)
+                        [](const HttpRequest& request, HttpResponse& response, const std::shared_ptr<Socket>& socket)
                         {
-                            HttpResponse response;
                             response.setCode(200);
                             const std::string response_string = "{msg: this is the response}";
                             response.setBody(response_string);
                             response.setHeaders({
-                                {"Content-Type", "application/json"},
                                 {"Content-Length", std::to_string(size(response_string))}
                             });
-                            const std::string res = response.toString();
-                            ::send(socket->getFd(), res.c_str(), res.length(), 0);
                         });
 
         auto acceptor = Acceptor(5555);
@@ -43,13 +40,55 @@ int main()
         acceptor.listen();
 
         auto mpl = MiddlewarePipeline();
-        // Add one middleware for example
-        mpl.use([](const HttpRequest& http_request, const std::shared_ptr<Socket>& socket, const Next& next)
+        // Add Rate Limiter as middleware
+        auto rate_limiter = RateLimiter(1, 60);
+        mpl.use([&rate_limiter](const HttpRequest& http_request, HttpResponse& response, const std::shared_ptr<Socket>& socket,
+                   const Next& next)
         {
-            Logger::info("method: " + http_request.getMethod());\
-            Logger::info("path: " + http_request.getPath());
+            if (rate_limiter.isAllowed(socket->getIp())) next();
+            else
+            {
+                response.setCode(429);
+                response.setBody("{msg: " + response.getCodeString() + "}");
+                const std::string res = response.toString();
+               ::send(socket->getFd(), res.c_str(), std::size(res), 0);
+            }
 
+        });
+
+        // Add CORS middleware
+        mpl.use([](const HttpRequest& http_request, HttpResponse& response, const std::shared_ptr<Socket>& socket,
+                   const Next& next)
+        {
+            if (http_request.getMethod() == "OPTIONS")
+            {
+                response.setHeaders({
+                    {"Access-Control-Allow-Origin", "*"},
+                    {"Access-Control-Allow-Methods", "*"}
+                });
+
+                response.setCode(204);
+                const std::string res = response.toString();
+                ::send(socket->getFd(), res.c_str(), std::size(res), 0);
+            }
+            else
+            {
+                response.setHeaders({{"Access-Control-Allow-Origin", "*"}});
+                next();
+            }
+        });
+
+        // Add Logger middleware
+        mpl.use([](const HttpRequest& http_request, HttpResponse& response, const std::shared_ptr<Socket>& socket,
+                   const Next& next)
+        {
+            const auto start_time = std::chrono::steady_clock::now();
             next();
+            const auto end_time = std::chrono::steady_clock::now();
+            const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+            Logger::info(
+                http_request.getMethod() + " " + http_request.getPath() + " - " + std::to_string(duration.count()) +
+                "ms");
         });
 
         while (true)
@@ -73,9 +112,12 @@ int main()
                     HttpParser parser;
                     HttpRequest request = parser.parse(buffer);
 
-                    mpl.execute(request, shared_socket, [&router, request, shared_socket]()
+                    HttpResponse response;
+                    mpl.execute(request, response, shared_socket, [&router, request, &response, shared_socket]()
                     {
-                        router.route(request, shared_socket);
+                        router.route(request, response, shared_socket);
+                        const std::string res = response.toString();
+                        ::send(shared_socket->getFd(), res.c_str(), res.length(), 0);
                     });
                 }
             });

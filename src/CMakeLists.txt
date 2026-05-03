@@ -3,6 +3,8 @@ add_library(webserver_lib
         net/Acceptor.cpp
         #threadpool/ThreadPool.cpp
         utils/Logger.cpp
+        utils/RateLimiter.cpp
+        utils/RateLimiter.h
 )
 
 target_include_directories(webserver_lib

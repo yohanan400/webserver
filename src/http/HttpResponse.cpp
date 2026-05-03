@@ -13,6 +13,7 @@ HttpResponse::HttpResponse()
         {400, "Bad Request"},
         {401, "Unauthorized"},
         {403, "Forbidden"},
+        {429, "Too Many Requests"},
         {404, "Not Found"},
         {500, "Internal Server Error"},
         {502, "Bad Gateway"},
@@ -45,7 +46,7 @@ void HttpResponse::setCode(const size_t code)
     if (_status_codes.find(code) != _status_codes.end())
     {
         _code = code;
-        _code_string = _status_codes[code];
+        _code_string = "Http Code: " + std::to_string(code) + " - " + _status_codes[code];
     }
     else throw std::runtime_error("HttpResponse::setCode Unsupported status code.");
 }

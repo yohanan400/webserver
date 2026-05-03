@@ -3,6 +3,7 @@
 #include <sys/socket.h>
 #include "utils/Logger.h"
 #include <stdexcept>
+#include <utility>
 
 Socket::Socket()
 {
@@ -19,7 +20,7 @@ Socket::Socket(Socket&& other) noexcept : _fd(other._fd)
     other._fd = -1;
 }
 
-Socket::Socket(const int fd) noexcept : _fd(fd)
+Socket::Socket(const int fd, std::string ip) noexcept : _fd(fd), _ip(std::move(ip))
 {
 }
 
@@ -38,6 +39,11 @@ Socket& Socket::operator=(Socket&& other) noexcept
 int Socket::getFd() const
 {
     return _fd;
+}
+
+std::string Socket::getIp() const
+{
+    return _ip;
 }
 
 Socket::~Socket()

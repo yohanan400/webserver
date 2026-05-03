@@ -5,7 +5,8 @@ void MiddlewarePipeline::use(const Middleware& middleware)
     _middlewares.push_back(middleware);
 }
 
-void MiddlewarePipeline::execute(const HttpRequest& request, const std::shared_ptr<Socket>& socket,
+void MiddlewarePipeline::execute(const HttpRequest& request, HttpResponse& response,
+                                 const std::shared_ptr<Socket>& socket,
                                  const Next& final_handler) const
 {
     std::function<void(size_t)> run = [&](size_t index)
@@ -20,7 +21,7 @@ void MiddlewarePipeline::execute(const HttpRequest& request, const std::shared_p
         }
 
         Next next = [&run, index]() { run(index + 1); };
-        _middlewares[index](request, socket, next);
+        _middlewares[index](request, response, socket, next);
     };
 
     run(0);
