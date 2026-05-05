@@ -13,9 +13,22 @@ void Router::route(const HttpRequest& request, HttpResponse& response, const std
 {
     const std::string full_path = request.getMethod() + ":" + request.getPath();
 
-    const auto it = _handlers_map.find(full_path);
+    auto it = _handlers_map.find(full_path);
     if (it == _handlers_map.end())
     {
+        if (request.getPath().find("/static/") == 0)
+        {
+            it = _handlers_map.find("GET:/static/");
+
+            if (it == _handlers_map.end())
+            {
+                Logger::error("Route " + full_path + " does not exist");
+                return;
+            }
+
+            it->second(request, response, socket);
+            return;
+        }
         Logger::error("Route " + full_path + " does not exist");
         return;
     }

@@ -1,8 +1,8 @@
-[To be honest.. I was to lazy to write down all this// so this is claude made ;)]
+[To be honest.. I was too lazy to write all this // so this is claude made ;)]
 
 # HTTP Web Server in C++17
 
-A fully functional HTTP/1.1 web server written from scratch in C++17, without any external server libraries. Built as a portfolio project demonstrating advanced systems programming concepts including multithreading, network programming, and design patterns.
+A fully functional HTTP/1.1 web server written from scratch in C++17, without any external server libraries. Built as a portfolio project demonstrating advanced systems programming concepts including multithreading, network programming, middleware design patterns, and HTTP protocol implementation.
 
 ---
 
@@ -11,8 +11,13 @@ A fully functional HTTP/1.1 web server written from scratch in C++17, without an
 - **TCP Server** — raw socket programming with `epoll`-ready architecture
 - **Thread Pool** — concurrent request handling with work queue and graceful shutdown
 - **HTTP Parser** — state-based parsing of HTTP/1.1 requests including headers, query strings, and body
-- **Router** — fast hash-map based routing with support for multiple HTTP methods
+- **Router** — fast hash-map based routing with support for multiple HTTP methods and static file serving
 - **HTTP Response** — structured response builder with automatic status text resolution
+- **Middleware Pipeline** — Chain of Responsibility pattern with recursive lambda dispatch
+- **Logger Middleware** — per-request timing using `std::chrono::steady_clock`
+- **CORS Middleware** — preflight `OPTIONS` handling and `Access-Control-*` headers
+- **Rate Limiter** — sliding-window IP-based rate limiting with `std::mutex` thread safety
+- **Static File Server** — serves files from `src/static/` with MIME type detection
 - **RAII throughout** — all resources (sockets, threads) managed automatically via C++ destructors
 
 ---
@@ -22,13 +27,18 @@ A fully functional HTTP/1.1 web server written from scratch in C++17, without an
 ```
 Client Request
       ↓
-  Acceptor Thread        (net/Acceptor)
+  Acceptor Thread        (net/Acceptor)       — accept() + extract client IP
       ↓
   Thread Pool            (threadpool/ThreadPool)
       ↓
   HTTP Parser            (http/HttpParser)
       ↓
-  Router                 (router/Router)
+  Middleware Pipeline    (middleware/Middleware)
+      ├── Rate Limiter   (utils/RateLimiter)  — 429 if exceeded
+      ├── CORS           — OPTIONS early return, Access-Control headers
+      └── Logger         — method + path + duration
+      ↓
+  Router                 (router/Router)       — exact match or /static/ prefix
       ↓
   Handler → HttpResponse (http/HttpResponse)
       ↓
@@ -43,21 +53,24 @@ Client Request
 webserver/
 ├── src/
 │   ├── net/
-│   │   ├── Socket.hpp / Socket.cpp       # RAII TCP socket wrapper
-│   │   └── Acceptor.hpp / Acceptor.cpp   # bind, listen, accept
+│   │   ├── Socket.hpp / Socket.cpp         # RAII TCP socket wrapper (fd + client IP)
+│   │   └── Acceptor.hpp / Acceptor.cpp     # bind, listen, accept
 │   ├── http/
-│   │   ├── HttpRequest.hpp / .cpp        # Parsed request object
-│   │   ├── HttpResponse.hpp / .cpp       # Response builder + toString()
-│   │   └── HttpParser.hpp / .cpp         # Raw bytes → HttpRequest
+│   │   ├── HttpRequest.hpp / .cpp          # Parsed request object
+│   │   ├── HttpResponse.hpp / .cpp         # Response builder + toString()
+│   │   └── HttpParser.hpp / .cpp           # Raw bytes → HttpRequest
 │   ├── router/
-│   │   └── Router.hpp / Router.cpp       # Method+path → handler dispatch
+│   │   └── Router.hpp / Router.cpp         # Method+path → handler dispatch
+│   ├── middleware/
+│   │   └── Middleware.hpp / Middleware.cpp  # Pipeline + recursive Next dispatch
 │   ├── threadpool/
-│   │   └── ThreadPool.hpp / .cpp         # Worker threads + work queue
+│   │   └── ThreadPool.hpp / .cpp           # Worker threads + work queue
 │   ├── utils/
-│   │   └── Logger.hpp / Logger.cpp       # Timestamped console logger
+│   │   ├── Logger.hpp / Logger.cpp         # Timestamped console logger
+│   │   └── RateLimiter.hpp / .cpp          # IP-based sliding window rate limiter
+│   ├── static/                             # Static files served under /static/*
 │   └── main.cpp
 ├── tests/
-├── benchmarks/
 ├── CMakeLists.txt
 └── README.md
 ```
@@ -82,12 +95,14 @@ cmake --build build
 ./build/bin/webserver
 ```
 
-For debug build with AddressSanitizer:
+> **Note:** Set the working directory to `src/` so relative paths (e.g. `static/`) resolve correctly.  
+> In CLion: Run/Debug Configurations → Working directory → `.../webserver/src`
+
+For debug build:
 
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
-./build/bin/webserver
 ```
 
 ---
@@ -97,18 +112,37 @@ cmake --build build
 ### Adding a Route
 
 ```cpp
-router.addRoute("GET", "/api/user", [](const HttpRequest& req, const std::shared_ptr<Socket>& socket) {
-    HttpResponse response;
-    response.setCode(200);
-    response.setBody(R"({"message": "Hello!"})");
-    response.setHeaders({
-        {"Content-Type", "application/json"},
-        {"Content-Length", std::to_string(response.getBody().size())}
+router.addRoute("GET", "/api/user",
+    [](const HttpRequest& req, HttpResponse& response, const std::shared_ptr<Socket>& socket) {
+        response.setCode(200);
+        response.setBody(R"({"message": "Hello!"})");
+        response.setHeaders({
+            {"Content-Type", "application/json"},
+            {"Content-Length", std::to_string(response.getBody().size())}
+        });
     });
-    const std::string res = response.toString();
-    ::send(socket->getFd(), res.c_str(), res.length(), 0);
+```
+
+### Adding a Middleware
+
+```cpp
+mpl.use([](const HttpRequest& req, HttpResponse& res,
+           const std::shared_ptr<Socket>& socket, const Next& next) {
+    // runs before handler
+    next();
+    // runs after handler
 });
 ```
+
+### Static Files
+
+Place any file under `src/static/` and access it via:
+
+```
+GET /static/filename.ext
+```
+
+Supported MIME types: `html`, `css`, `js`, `json`, `xml`, `txt`, `png`, `jpg`, `jpeg`, `gif`, `svg`, `pdf`, `zip`, `mp3`, `mp4`.
 
 ### Testing with curl
 
@@ -116,13 +150,17 @@ router.addRoute("GET", "/api/user", [](const HttpRequest& req, const std::shared
 # Basic request
 curl http://localhost:5555/api/user
 
-# Verbose output (shows headers)
+# Verbose (shows response headers)
 curl -v http://localhost:5555/api/user
 
-# POST request with body
-curl -X POST http://localhost:5555/api/user \
-     -H "Content-Type: application/json" \
-     -d '{"name": "John"}'
+# Static file
+curl http://localhost:5555/static/index.html
+
+# CORS preflight
+curl -X OPTIONS http://localhost:5555/api/user -v
+
+# Trigger rate limiter (run 101 times)
+for i in $(seq 1 101); do curl -s http://localhost:5555/api/user; done
 ```
 
 ---
@@ -130,16 +168,22 @@ curl -X POST http://localhost:5555/api/user \
 ## Design Decisions
 
 ### RAII for Sockets
-Every file descriptor is wrapped in a `Socket` object. The destructor calls `close()` automatically — no manual cleanup required, no leaks possible.
+Every file descriptor is wrapped in a `Socket` object that also stores the client IP. The destructor calls `close()` automatically — no manual cleanup required.
 
 ### Thread Pool with Condition Variable
 Worker threads sleep via `std::condition_variable` when the queue is empty — zero CPU usage while idle. A `std::atomic<bool>` signals shutdown without a mutex.
 
 ### Hash-Map Router
-Routes are stored as `"METHOD:path"` keys in `std::unordered_map`, giving O(1) lookup regardless of the number of registered routes.
+Routes are stored as `"METHOD:path"` keys in `std::unordered_map`, giving O(1) lookup. Static file requests fall through to a `/static/` prefix check.
 
-### HTTP Parser
-Parsing is split into three stages — request line, headers, body — each operating on a `std::string` slice of the raw input using `find` and `substr`. No regex, no external libraries.
+### Middleware Pipeline
+Middlewares are stored as a `std::vector<std::function<...>>`. Dispatch uses a recursive lambda with an index — each middleware calls `next()` to advance the chain. This is the Chain of Responsibility pattern.
+
+### Rate Limiter
+Uses a sliding window: each IP maps to `{count, first_request_time}`. On each request, if the time window has expired the counter resets; otherwise it increments. Protected by `std::mutex` + `std::lock_guard` for thread safety.
+
+### CORS
+The CORS middleware handles `OPTIONS` preflight with an early return (204, no `next()` call) and adds `Access-Control-*` headers to all other responses before passing to the next middleware.
 
 ---
 
@@ -148,27 +192,34 @@ Parsing is split into three stages — request line, headers, body — each oper
 | Concept | Where |
 |---|---|
 | Raw TCP sockets | `net/Socket`, `net/Acceptor` |
-| RAII | `Socket` destructor, `unique_lock` |
+| RAII | `Socket` destructor, `lock_guard` |
 | Thread pool | `threadpool/ThreadPool` |
 | `std::mutex` + `std::condition_variable` | `ThreadPool` work queue |
+| `std::mutex` + `std::lock_guard` | `RateLimiter` |
 | `std::atomic` | `ThreadPool::_stop` |
 | Move semantics | `Socket(Socket&&)`, lambda captures |
 | `shared_ptr` | Socket lifetime across threads |
 | Hash map routing | `Router::_handlers_map` |
 | HTTP/1.1 parsing | `HttpParser` |
-| Design patterns | RAII, Reactor (Acceptor), Chain of Responsibility (planned Middleware) |
+| Chain of Responsibility | `MiddlewarePipeline` |
+| Recursive lambda | `MiddlewarePipeline::execute` |
+| `std::chrono::steady_clock` | Logger middleware timing |
+| MIME type detection | Static file handler |
+| Design patterns | RAII, Reactor (Acceptor), Chain of Responsibility (Middleware) |
 
 ---
 
 ## Roadmap
 
-- [ ] Static file server with `mmap`
-- [ ] Middleware pipeline (logger, CORS, gzip)
+- [x] TCP Server + Thread Pool
+- [x] HTTP Parser + Router
+- [x] Middleware Pipeline
+- [x] Logger / CORS / Rate Limiter middlewares
+- [x] Static File Server
 - [ ] Keep-Alive connection management
 - [ ] `epoll` non-blocking I/O
 - [ ] TLS/HTTPS via OpenSSL
 - [ ] Benchmarking vs nginx with `wrk`
-- [ ] C++17 version with coroutines
 
 ---
 

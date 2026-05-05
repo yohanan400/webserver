@@ -13,6 +13,7 @@ HttpResponse::HttpResponse()
         {400, "Bad Request"},
         {401, "Unauthorized"},
         {403, "Forbidden"},
+        {415, "Unsupported Media Type"},
         {429, "Too Many Requests"},
         {404, "Not Found"},
         {500, "Internal Server Error"},

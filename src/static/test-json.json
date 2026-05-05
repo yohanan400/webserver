@@ -1,0 +1,4 @@
+{
+  "file-name": "test-json",
+  "content": "This is just a simple test json file, to make sure the file get back to the client."
+}
