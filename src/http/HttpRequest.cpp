@@ -59,3 +59,8 @@ void HttpRequest::setVersion(const std::string& version)
 {
     _version = version;
 }
+
+[[nodiscard]] bool HttpRequest::isHeaderContains(const std::string& name) const
+{
+    return _headers.find(name) != _headers.end();
+}

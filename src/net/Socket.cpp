@@ -46,6 +46,12 @@ std::string Socket::getIp() const
     return _ip;
 }
 
+void Socket::setTimeOut(const int tv_sec) const
+{
+    const timeval time_out {tv_sec, 0};
+    setsockopt(_fd, SOL_SOCKET, SO_RCVTIMEO, &time_out, sizeof(time_out));
+}
+
 Socket::~Socket()
 {
     if (_fd != -1)

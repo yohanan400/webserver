@@ -61,10 +61,10 @@ int main()
                         [](const HttpRequest& request, HttpResponse& response, const std::shared_ptr<Socket>& socket)
                         {
                             const std::string path = request.getPath();
-                            std::string file_name = path.substr(path.find_last_of('/')+1);
+                            std::string file_name = path.substr(path.find_last_of('/') + 1);
 
                             const std::string file_path{"static/" + file_name};
-                            const std::string file_type{file_name.substr(file_name.find('.')+1)};
+                            const std::string file_type{file_name.substr(file_name.find('.') + 1)};
                             const std::ifstream file{file_path, std::ios::in | std::ios::binary};
 
                             if (!file.is_open())
@@ -81,13 +81,14 @@ int main()
 
                             if (mimeTypes.find(file_type) != mimeTypes.end())
                             {
-                                std::string content_type {mimeTypes.find(file_type)->second};
+                                std::string content_type{mimeTypes.find(file_type)->second};
                                 response.setHeaders({
                                     {"Content-Type", content_type},
                                     {"Content-Length", std::to_string(std::size(response.getBody()))}
                                 });
                                 response.setCode(200);
-                            }else
+                            }
+                            else
                             {
                                 response.setHeaders({
                                     {"Content-Length", std::to_string(std::size(response.getBody()))}
@@ -160,28 +161,54 @@ int main()
             thread_pool.submit([&mpl, shared_socket, &router]()
             {
                 Logger::info("Socket accepted " + std::to_string(shared_socket->getFd()));
-
-                std::string buffer(4096, '\0');
-                ssize_t result = ::recv(shared_socket->getFd(), buffer.data(), buffer.size(), 0);
-                buffer.resize(result);
-
-                if (result <= 0) Logger::info("recv failed!");
-                else
+                constexpr size_t MAX_BUFFER_SIZE = 4096;
+                auto start_keep_alive_time = std::chrono::steady_clock::now();
+                bool KEEP_ALIVE = true;
+                constexpr auto MAX_KEEP_ALIVE_TIMEOUT = std::chrono::seconds(5);
+                shared_socket->setTimeOut(5);
+                do
                 {
+                    std::string buffer(MAX_BUFFER_SIZE, '\0');
+                    ssize_t result = ::recv(shared_socket->getFd(), buffer.data(), buffer.size(), 0);
+
+                    if (result <= 0)
+                    {
+                        if (errno == EAGAIN) Logger::info("Keep-Alive timeout, closing connection");
+                        else Logger::error("recv failed!");
+                        break;
+                    }
+                    buffer.resize(result);
+
                     Logger::info("recv success!");
                     Logger::info(buffer);
 
                     HttpParser parser;
                     HttpRequest request = parser.parse(buffer);
 
-                    HttpResponse response;
-                    mpl.execute(request, response, shared_socket, [&router, request, &response, shared_socket]()
+                    if (request.isHeaderContains("Connection"))
                     {
-                        router.route(request, response, shared_socket);
-                        const std::string res = response.toString();
-                        ::send(shared_socket->getFd(), res.c_str(), res.length(), 0);
-                    });
+                        if (request.getHeaders().find("Connection")->second == "keep-alive")
+                            KEEP_ALIVE = true;
+                        else if (request.getHeaders().find("Connection")->second == "close")
+                            KEEP_ALIVE = false;
+                    }
+
+                    if (std::chrono::steady_clock::now() - start_keep_alive_time > MAX_KEEP_ALIVE_TIMEOUT)
+                        KEEP_ALIVE = false;
+
+                    HttpResponse response;
+                    mpl.execute(request, response, shared_socket,
+                                [KEEP_ALIVE, &router, request, &response, shared_socket]()
+                                {
+                                    if (!KEEP_ALIVE) response.setHeaders({{"Connection", "close"}});
+                                    router.route(request, response, shared_socket);
+                                    const std::string res = response.toString();
+                                    ::send(shared_socket->getFd(), res.c_str(), res.length(), 0);
+                                });
+
+                    start_keep_alive_time = std::chrono::steady_clock::now();
                 }
+                while (KEEP_ALIVE);
             });
         }
     }

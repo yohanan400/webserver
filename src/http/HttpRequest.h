@@ -25,6 +25,8 @@ public:
     [[nodiscard]] std::string getVersion() const;
     void setVersion(const std::string& version);
 
+    [[nodiscard]] bool isHeaderContains(const std::string& name) const;
+
 private:
     std::string _method;
     std::string _path;

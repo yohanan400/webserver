@@ -12,6 +12,7 @@ public:
     Socket& operator=(Socket&&) noexcept;
     [[nodiscard]] int getFd() const;
     [[nodiscard]] std::string getIp() const;
+    void setTimeOut(int tv_sec) const;
     ~Socket();
 
 private:
