@@ -36,6 +36,16 @@ Socket& Socket::operator=(Socket&& other) noexcept
     return *this;
 }
 
+ssize_t Socket::send(const void* buf, const size_t n, const int flags)
+{
+    return ::send(_fd, buf, n, flags);
+}
+
+ssize_t Socket::recv(void* buf, const size_t n, const int flags)
+{
+    return ::recv(_fd, buf, n, flags);
+}
+
 int Socket::getFd() const
 {
     return _fd;

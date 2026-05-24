@@ -1,5 +1,4 @@
 #include "Acceptor.h"
-#include <cstring>
 #include <stdexcept>
 #include <netinet/in.h>
 #include <cerrno>
@@ -20,7 +19,7 @@ Acceptor::Acceptor(const int port, const int backlog) : _port(port), _backlog(ba
     }
 }
 
-void Acceptor::bind()
+void Acceptor::bind() const
 {
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
@@ -36,7 +35,7 @@ void Acceptor::bind()
     }
 }
 
-void Acceptor::listen()
+void Acceptor::listen() const
 {
     int result = ::listen(_socket.getFd(), _backlog);
 
@@ -47,7 +46,7 @@ void Acceptor::listen()
     }
 }
 
-Socket Acceptor::accept()
+SSLSocket Acceptor::accept() const
 {
     sockaddr_storage their_addr{};
     socklen_t their_addr_len = sizeof(their_addr);
@@ -59,7 +58,7 @@ Socket Acceptor::accept()
         throw std::runtime_error("accept() failed");
     }
 
-    auto* addr_in = reinterpret_cast<sockaddr_in*>(&their_addr);
-    std::string ip = inet_ntoa(addr_in->sin_addr);
-    return Socket(result, ip);
+    const auto* addr_in = reinterpret_cast<sockaddr_in*>(&their_addr);
+    const std::string ip = inet_ntoa(addr_in->sin_addr);
+    return {result, ip};
 }

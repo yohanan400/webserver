@@ -1,14 +1,15 @@
 #pragma once
 #include "Socket.h"
+#include "SSLSocket.h"
 
 class Acceptor
 {
 public:
-    Acceptor(int port, int backlog = 20);
+    explicit Acceptor(int port, int backlog = 20);
     ~Acceptor() = default;
-    void bind();
-    void listen();
-    Socket accept();
+    void bind() const;
+    void listen() const;
+    [[nodiscard]] SSLSocket accept() const;
 
 private:
     Socket _socket;

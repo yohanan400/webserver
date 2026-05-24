@@ -5,6 +5,8 @@ add_library(webserver_lib
         utils/Logger.cpp
         utils/RateLimiter.cpp
         utils/RateLimiter.h
+        net/SSLSocket.cpp
+        net/SSLSocket.h
 )
 
 target_include_directories(webserver_lib
@@ -24,4 +26,6 @@ add_executable(webserver main.cpp
         http/HttpResponse.h
         middleware/Middleware.cpp
         middleware/Middleware.h)
-target_link_libraries(webserver PRIVATE webserver_lib stdc++)
+
+find_package(OpenSSL REQUIRED)
+target_link_libraries(webserver PUBLIC OpenSSL::SSL OpenSSL::Crypto PRIVATE webserver_lib stdc++)

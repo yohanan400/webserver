@@ -10,6 +10,7 @@
 #include "middleware/Middleware.h"
 #include "net/Acceptor.h"
 #include "net/Socket.h"
+#include "net/SSLSocket.h"
 #include "threadpool/ThreadPool.h"
 #include "utils/Logger.h"
 #include "router/Router.h"
@@ -115,7 +116,7 @@ int main()
                 response.setCode(429);
                 response.setBody("{msg: " + response.getCodeString() + "}");
                 const std::string res = response.toString();
-                ::send(socket->getFd(), res.c_str(), std::size(res), 0);
+                socket->send(res.c_str(), std::size(res), 0);
             }
         });
 
@@ -132,7 +133,7 @@ int main()
 
                 response.setCode(204);
                 const std::string res = response.toString();
-                ::send(socket->getFd(), res.c_str(), std::size(res), 0);
+                socket->send(res.c_str(), std::size(res), 0);
             }
             else
             {
@@ -154,10 +155,12 @@ int main()
                 "ms");
         });
 
+        SSLSocket::initCTX("cert.pem", "key.pem");
+
         while (true)
         {
-            Socket new_socket = acceptor.accept();
-            auto shared_socket = std::make_shared<Socket>(std::move(new_socket));
+            SSLSocket new_socket = acceptor.accept();
+            auto shared_socket = std::make_shared<SSLSocket>(std::move(new_socket));
             thread_pool.submit([&mpl, shared_socket, &router]()
             {
                 Logger::info("Socket accepted " + std::to_string(shared_socket->getFd()));
@@ -169,7 +172,7 @@ int main()
                 do
                 {
                     std::string buffer(MAX_BUFFER_SIZE, '\0');
-                    ssize_t result = ::recv(shared_socket->getFd(), buffer.data(), buffer.size(), 0);
+                    ssize_t result = shared_socket->recv(buffer.data(), buffer.size(), 0);
 
                     if (result <= 0)
                     {
@@ -203,7 +206,7 @@ int main()
                                     if (!KEEP_ALIVE) response.setHeaders({{"Connection", "close"}});
                                     router.route(request, response, shared_socket);
                                     const std::string res = response.toString();
-                                    ::send(shared_socket->getFd(), res.c_str(), res.length(), 0);
+                                    shared_socket->send( res.c_str(), res.length(), 0);
                                 });
 
                     start_keep_alive_time = std::chrono::steady_clock::now();
@@ -215,7 +218,9 @@ int main()
     catch (std::exception& e)
     {
         Logger::error(e.what());
+        SSLSocket::cleanupCTX();
     }
 
+    SSLSocket::cleanupCTX();
     return 0;
 }
