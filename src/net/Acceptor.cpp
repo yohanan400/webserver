@@ -5,6 +5,7 @@
 #include "Socket.h"
 #include "utils/Logger.h"
 #include <arpa/inet.h>
+#include <sys/epoll.h>
 
 Acceptor::Acceptor(const int port, const int backlog) : _port(port), _backlog(backlog)
 {
@@ -61,4 +62,9 @@ SSLSocket Acceptor::accept() const
     const auto* addr_in = reinterpret_cast<sockaddr_in*>(&their_addr);
     const std::string ip = inet_ntoa(addr_in->sin_addr);
     return {result, ip};
+}
+
+int Acceptor::getFd() const
+{
+    return _socket.getFd();
 }

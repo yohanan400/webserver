@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/socket.h>
 
+#include "EventLoop.h"
 #include "http/HttpParser.h"
 #include "http/HttpRequest.h"
 #include "http/HttpResponse.h"
@@ -157,63 +158,9 @@ int main()
 
         SSLSocket::initCTX("cert.pem", "key.pem");
 
-        while (true)
-        {
-            SSLSocket new_socket = acceptor.accept();
-            auto shared_socket = std::make_shared<SSLSocket>(std::move(new_socket));
-            thread_pool.submit([&mpl, shared_socket, &router]()
-            {
-                Logger::info("Socket accepted " + std::to_string(shared_socket->getFd()));
-                constexpr size_t MAX_BUFFER_SIZE = 4096;
-                auto start_keep_alive_time = std::chrono::steady_clock::now();
-                bool KEEP_ALIVE = true;
-                constexpr auto MAX_KEEP_ALIVE_TIMEOUT = std::chrono::seconds(5);
-                shared_socket->setTimeOut(5);
-                do
-                {
-                    std::string buffer(MAX_BUFFER_SIZE, '\0');
-                    ssize_t result = shared_socket->recv(buffer.data(), buffer.size(), 0);
+       EventLoop ev = EventLoop(mpl, thread_pool, acceptor);
+       ev.loop(router);
 
-                    if (result <= 0)
-                    {
-                        if (errno == EAGAIN) Logger::info("Keep-Alive timeout, closing connection");
-                        else Logger::error("recv failed!");
-                        break;
-                    }
-                    buffer.resize(result);
-
-                    Logger::info("recv success!");
-                    Logger::info(buffer);
-
-                    HttpParser parser;
-                    HttpRequest request = parser.parse(buffer);
-
-                    if (request.isHeaderContains("Connection"))
-                    {
-                        if (request.getHeaders().find("Connection")->second == "keep-alive")
-                            KEEP_ALIVE = true;
-                        else if (request.getHeaders().find("Connection")->second == "close")
-                            KEEP_ALIVE = false;
-                    }
-
-                    if (std::chrono::steady_clock::now() - start_keep_alive_time > MAX_KEEP_ALIVE_TIMEOUT)
-                        KEEP_ALIVE = false;
-
-                    HttpResponse response;
-                    mpl.execute(request, response, shared_socket,
-                                [KEEP_ALIVE, &router, request, &response, shared_socket]()
-                                {
-                                    if (!KEEP_ALIVE) response.setHeaders({{"Connection", "close"}});
-                                    router.route(request, response, shared_socket);
-                                    const std::string res = response.toString();
-                                    shared_socket->send( res.c_str(), res.length(), 0);
-                                });
-
-                    start_keep_alive_time = std::chrono::steady_clock::now();
-                }
-                while (KEEP_ALIVE);
-            });
-        }
     }
     catch (std::exception& e)
     {

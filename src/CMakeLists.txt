@@ -25,7 +25,10 @@ add_executable(webserver main.cpp
         http/HttpResponse.cpp
         http/HttpResponse.h
         middleware/Middleware.cpp
-        middleware/Middleware.h)
+        middleware/Middleware.h
+        EventLoop.cpp
+        EventLoop.h
+        net/Acceptor.h)
 
 find_package(OpenSSL REQUIRED)
 target_link_libraries(webserver PUBLIC OpenSSL::SSL OpenSSL::Crypto PRIVATE webserver_lib stdc++)

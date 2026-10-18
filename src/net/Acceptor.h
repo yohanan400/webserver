@@ -10,6 +10,7 @@ public:
     void bind() const;
     void listen() const;
     [[nodiscard]] SSLSocket accept() const;
+    [[nodiscard]] int getFd() const;
 
 private:
     Socket _socket;
