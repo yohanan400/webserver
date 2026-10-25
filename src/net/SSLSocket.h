@@ -12,6 +12,7 @@ public:
     static void initCTX(const std::string& cert, const std::string& key);
     static void cleanupCTX();
     ~SSLSocket() override;
+    std::string _buffer;
 
 private:
     static SSL_CTX *_ctx;

@@ -2,16 +2,24 @@
 #include <sys/epoll.h>
 #include <utils/Logger.h>
 #include <fcntl.h>
+#include <stdexcept>
+
 #include "http/HttpParser.h"
 
 EventLoop::EventLoop(MiddlewarePipeline& middleware, ThreadPool& thread_pool, Acceptor& acceptor):
                 _middleware(middleware), _threadPool(thread_pool), _acceptor(acceptor)
 {
     _epollFd = epoll_create1(0);
+    if (_epollFd == -1)
+        throw std::runtime_error("epoll_create1 failed: " + std::string(strerror(errno)));
+
     epoll_event ev;
     ev.events = EPOLLIN;
     ev.data.fd = _acceptor.getFd();
-    epoll_ctl(_epollFd, EPOLL_CTL_ADD, _acceptor.getFd(), &ev);
+    auto result = epoll_ctl(_epollFd, EPOLL_CTL_ADD, _acceptor.getFd(), &ev);
+
+    if (result == -1)
+        throw std::runtime_error("epoll_ctl failed: " + std::string(strerror(errno)));
 }
 
 void EventLoop::addConnection(std::shared_ptr<SSLSocket> conn)
@@ -59,42 +67,69 @@ void EventLoop::loop(Router& router)
                 }
             }
             else {
-                auto shared_socket = _connections[events[i].data.fd];
+                std::shared_ptr<SSLSocket> shared_socket;
+                {
+                    std::lock_guard<std::mutex> lock(_mutex);
+                    auto it = _connections.find(events[i].data.fd);
+                    if (it == _connections.end()) continue;
+                    shared_socket = it->second;
+                }
+
+                if (events[i].events & (EPOLLHUP | EPOLLERR)) {
+                    removeConnection(shared_socket);
+                    continue;
+                }
 
                 _threadPool.submit([shared_socket, &router, this]()
                 {
                     Logger::info("Socket accepted " + std::to_string(shared_socket->getFd()));
                     constexpr size_t MAX_BUFFER_SIZE = 4096;
 
-                    while (true)
+                    try
                     {
-                        std::string buffer(MAX_BUFFER_SIZE, '\0');
-                        ssize_t result = shared_socket->recv(buffer.data(), buffer.size(), 0);
-
-                        if (result == 0)
+                        while (true)
                         {
-                            Logger::info("Connection closed by client");
-                            removeConnection(shared_socket);
-                            break;
-                        }
-
-                        if (result == -1)
-                        {
-                            if (errno == EAGAIN) Logger::info("Done reading");
-                            else
+                            std::string buffer(MAX_BUFFER_SIZE, '\0');
+                            ssize_t result;
+                            while (true)
                             {
-                                Logger::error("Error occur while tring to receive data!");
-                                removeConnection(shared_socket);
+                                result = shared_socket->recv(buffer.data(), MAX_BUFFER_SIZE, 0);
+                                if (result > 0) shared_socket->_buffer += buffer.substr(0, result);
+                                else break;
                             }
-                            break;
-                        }
-                        buffer.resize(result);
 
-                        Logger::info("recv success!");
-                        Logger::info(buffer);
+                            if (result == 0)
+                            {
+                                Logger::info("Connection closed by client");
+                                removeConnection(shared_socket);
+                                break;
+                            }
 
-                        HttpParser parser;
-                        HttpRequest request = parser.parse(buffer);
+                            if (result == -1)
+                            {
+                                if (errno == EAGAIN)
+                                {
+                                    if (shared_socket->_buffer.find("\r\n\r\n") == std::string::npos)
+                                    {
+                                        Logger::info("EAGAIN received before reading all. Pause socket reading.");
+                                        continue;
+                                    }
+                                }
+                                else
+                                {
+                                    Logger::error("Error occur while tring to receive data!");
+                                    removeConnection(shared_socket);
+                                    break;
+                                }
+                            }
+
+                            Logger::info("recv success!");
+                            Logger::info(shared_socket->_buffer);
+
+                            HttpParser parser;
+                            HttpRequest request = parser.parse(shared_socket->_buffer);
+
+                            shared_socket->_buffer.clear();
 
                         HttpResponse response;
                         _middleware.execute(request, response, shared_socket,
@@ -104,6 +139,12 @@ void EventLoop::loop(Router& router)
                                         const std::string res = response.toString();
                                         shared_socket->send( res.c_str(), res.length(), 0);
                                     });
+                        }
+                    }
+                    catch (std::exception& e)
+                    {
+                        Logger::error("Connection Error: " + std::string(e.what()));
+                        removeConnection(shared_socket);
                     }
                 });
             }
